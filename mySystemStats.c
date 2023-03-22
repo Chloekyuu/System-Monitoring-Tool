@@ -189,12 +189,9 @@ void show_core_info() {
     // Get the number of processors which are currently online.
     int cores = (int) sysconf(_SC_NPROCESSORS_ONLN);
 
-    // If on error (return -1), report the error.
-    // Otherwise print the information.
-    if (cores < 0) {
+    if (cores < 0) {  // If on error (return -1), report the error.
         perror("sysconf");
-    } else {
-        printf("---------------------------------------\n");
+    } else {          // Otherwise print the information.
         printf("Number of cores: %d\n", cores);
     }
 }
@@ -374,8 +371,8 @@ void show_usage_sequential(int sample, int tdelay, int graph_flag) {
 /** @brief Prints User Usage information.
  *
  *  Use getutent() function from <utmp.h> library to get the user usage.
- *  Print user's name (if has), type of the terminal device, and their
- *  remote IP address (if has).
+ *  Print user's name, type of the terminal device, and their remote IP
+ *  address iff the username exists.
  *
  *  @return Void.
  */
@@ -388,22 +385,22 @@ void show_session_user() {
 
     // while we still have users, print their information
     while(users != NULL) {
-        // print username (if exists)
-        if(strcmp(users -> ut_user, "") != 0) {
-            printf(" %s\t", users -> ut_user);
-        } else {
-            printf("\t\t");
-        }
-        // print which type of the terminal device is being used
-        printf("%s ", users -> ut_line);
-        // print remote IP address (if exists)
-        if(strcmp(users -> ut_host, "") != 0) {
-            printf("(%s)\n", users -> ut_host);
-        } else {
-            printf("\n");
+        // print user information if username exists
+        if(strcmp(users -> ut_user, "") != 0 &&        // If username not empty
+            strcmp(users -> ut_user, "LOGIN") != 0 &&  // If username not LOGIN
+            strcmp(users -> ut_line, "~") != 0) {      // If terminal not ~
+            // print username and which type of the terminal device is being used
+            printf(" %s\t%s ", users -> ut_user, users -> ut_line);
+            // print remote IP address (if exists)
+            if(strcmp(users -> ut_host, "") != 0) {
+                printf("(%s)\n", users -> ut_host);
+            } else {
+                printf("\n");
+            }
         }
         users = getutent(); // get the next user information
     }
+    printf("---------------------------------------\n");
 }
 
 /** @brief Prints system information.
