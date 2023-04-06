@@ -16,17 +16,7 @@
 #ifndef __Stats_header
 #define __Stats_header
 
-/** @brief Move the cursor up.
- *  @param lines The number of lines the cursor moves.
- *  @return Void.
- */
-void move_up(int lines);
-
-/** @brief Move the cursor down.
- *  @param lines The number of lines the cursor moves.
- *  @return Void.
- */
-void move_down(int lines);
+void handle_error(char *message);
 
 /** @brief Print the memory usage of the current process in C (in kilobytes).
  *  @return Void.
@@ -80,7 +70,7 @@ long get_memory_info(long previous_use, int graph_flag);
  *  @param tdelay The period of time system between each time reading CPU info.
  *  @return A double of the current CPU usage (in percentage).
  */
-double calculate_cpu_use(int tdelay);
+void calculate_cpu_use(int tdelay);
 
 /** @brief Virtualize the CPU usage (in percentage).
  *
@@ -95,7 +85,7 @@ void show_cpu_graph(double percent);
 /** @brief Prints the number of CPU cores and CPU usage percentage.
  *  @return Void.
  */
-double show_cpu_info(int tdelay);
+void show_cpu_info(double cpu_use);
 
 /** @brief Prints User Usage information.
  *
@@ -105,7 +95,7 @@ double show_cpu_info(int tdelay);
  *
  *  @return Void.
  */
-int show_session_user();
+void show_session_user();
 
 /** @brief Prints system information.
  *
@@ -115,31 +105,5 @@ int show_session_user();
  *  @return Void.
  */
 void show_sys_info();
-
-
-/** @brief Validate the command line arguments user gived.
- *
- *  Use flags to indicate whether an argument is been called.
- *  Set the flag variables to 1 if does, and 0 if not.
- *  If any argument call violates the assumptions (see README.txt
- *  part c "Assumptions made:"), report an error.
- *  Note that "--samples=N" and "--tdelay=T" can be considered as
- *  positional arguments if they are not flagged.
- *
- *  @param argc Number of ommand line arguments.
- *  @param argv The array of strings storing command line arguments.
- *  @param sample Number of times the statistics are going to be collected.
- *  @param tdelay Period of time the statistics refresh (in seconds).
- *  @param sys_flag Point to an integer to indicate if "--system" is been called
- *  @param user_flag Point to an integer to indicate if "--user" is been called
- *  @param sequential_flag Point to an integer to indicate if "--sequential" is been called
- *  @param graph_flag Point to an integer to indicate if "--graphics" is been called
- *  @param sample_flag Point to an integer to indicate if "--sample=N" is been called
- *  @param tdelay_flag Point to an integer to indicate if "--tdelay=T" is been called
- *  @return Void.
- */
-void vertify_arg(int argc, char *argv[], int *sample, int *tdelay, int *sys_flag,
-    int *user_flag, int *sequential_flag, int *graph_flag, int *sample_flag, int *tdelay_flag);
-
 
 #endif

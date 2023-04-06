@@ -26,22 +26,6 @@ void handle_error(char *message) {
     exit(0);
 }
 
-/** @brief Move the cursor up.
- *  @param lines The number of lines the cursor moves.
- *  @return Void.
- */
-void move_up(int lines) {
-    printf("\x1b[%dF", lines);
-}
-
-/** @brief Move the cursor down.
- *  @param lines The number of lines the cursor moves.
- *  @return Void.
- */
-void move_down(int lines) {
-   printf("\x1b[%dE", lines);
-}
-
 /** @brief Print the memory usage of the current process in C (in kilobytes).
  *  @return Void.
  */
@@ -49,9 +33,11 @@ void show_runtime_info() {
     struct rusage r_usage; // A variable to store resource usage section
     if (getrusage(RUSAGE_SELF,&r_usage) < 0) { // Get the resource usage statistics
         perror("rusage"); // If fail to get, report the error
+        exit(1);
     } else {
         // Print the maximum resident set size used (in kilobytes).
         printf(" Memory usage: %ld kilobytes\n", r_usage.ru_maxrss);
+        printf("---------------------------------------\n");
     }
 }
 
@@ -122,6 +108,7 @@ long get_memory_info(long previous_use, int graph_flag) {
     // If cannot open the file, report an error
     if((meminfo = fopen("/proc/meminfo", "r")) == NULL) {
         perror("fopen");
+        exit(1);
     }
 
     // Loop the file util read all the information we need
@@ -153,10 +140,11 @@ long get_memory_info(long previous_use, int graph_flag) {
             // If fails, report an error.
             if (fclose(meminfo) != 0) {
                 perror("fclose");
+                exit(1);
             }
         }
     }
-    // Display the memory usage information
+
     printf("%.2f GB / %.2f GB  -- %.2f GB / %.2f GB", phys_used * 1e-9,
         total_phys * 1e-9, virtual_used * 1e-9, total_virtual * 1e-9);
 
@@ -167,8 +155,6 @@ long get_memory_info(long previous_use, int graph_flag) {
     } else {
         printf("\n");
     }
-
-    // Return the physical memory usage at current stage.
     return phys_used;
 }
 
@@ -186,12 +172,13 @@ long get_memory_info(long previous_use, int graph_flag) {
  *  @param tdelay The period of time system between each time reading CPU info.
  *  @return A double of the current CPU usage (in percentage).
  */
-double calculate_cpu_use(int tdelay) {
+void calculate_cpu_use(int tdelay) {
     FILE * stat; // A file pointer pointing to "/proc/stat"
 
     // If fail to open the file, report an error
     if((stat = fopen("/proc/stat", "r")) == NULL) {
         perror("fopen");
+        exit(1);
     }
 
     // Variables storing the CPU information read from "/proc/stat"
@@ -233,7 +220,10 @@ double calculate_cpu_use(int tdelay) {
     double cpu_use = 100 * (double)numerator / (double)denominator;
 
     // Return the current CPU usage for graphics
-    return cpu_use;
+    if (write(fileno(stdout), &cpu_use, sizeof(double)) == -1) {
+        perror("write");
+    }
+    // return cpu_use;
 }
 
 /** @brief Virtualize the CPU usage (in percentage).
@@ -247,17 +237,17 @@ double calculate_cpu_use(int tdelay) {
 void show_cpu_graph(double percent) {
     printf("\t");
     // Print '|' in proportion to the CPU usage percentage
-    for (int i = 0; i < (int) percent / 2; i ++) {
+    for (int i = 0; i < (int) percent; i ++) {
         printf("|");
     }
     // Print the CPU usage percentage at the end of the graph
-    printf("%f\n", percent);
+    printf(" %f%%\n", percent);
 }
 
 /** @brief Prints the number of CPU cores and CPU usage percentage.
  *  @return Void.
  */
-double show_cpu_info(int tdelay) {
+void show_cpu_info(double cpu_use) {
     // Get the number of processors which are currently online.
     int cores = (int) sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -267,12 +257,8 @@ double show_cpu_info(int tdelay) {
         printf("Number of cores: %d\n", cores);
     }
     
-    // calculate cpu usage
-    printf(" total cpu use = ");
-    double cpu_use = calculate_cpu_use(tdelay);
-    printf("%.2f%%\n", cpu_use);
-
-    return cpu_use;
+    // display cpu usage
+    printf(" total cpu use = %.2f%%\n", cpu_use);
 }
 
 /** @brief Prints User Usage information.
@@ -283,35 +269,22 @@ double show_cpu_info(int tdelay) {
  *
  *  @return Void.
  */
-int show_session_user() {
+void show_session_user() {
     struct utmp *users; // a variable to store user information
     users = getutent(); // get the information about who is currently using the system.
-    int n = 0;          // store number of user sampled
 
     printf("### Sessions/users ###\n");
 
     // while we still have users, print their information
     while(users != NULL) {
         // print user information if username exists
-        if(strcmp(users -> ut_user, "") != 0 &&        // If username not empty
-            strcmp(users -> ut_user, "LOGIN") != 0 &&  // If username not LOGIN
-            strcmp(users -> ut_line, "~") != 0 &&
-            strcmp(users -> ut_host, "") != 0) {      // If terminal not ~
-            // print username and which type of the terminal device is being used
-            printf(" %s\t%s ", users -> ut_user, users -> ut_line);
-            // print remote IP address (if exists)
-            if(strcmp(users -> ut_host, "") != 0) {
-                printf("(%s)\n", users -> ut_host);
-            } else {
-                printf("\n");
-            }
-            n ++;
+        if (users -> ut_type == USER_PROCESS) {
+        	printf(" %s\t%s (%s)\n", users -> ut_user, users -> ut_line, users -> ut_host);
         }
         users = getutent(); // get the next user information
     }
     endutent();
     printf("---------------------------------------\n");
-    return n;
 }
 
 /** @brief Prints system information.
@@ -335,130 +308,4 @@ void show_sys_info() {
     printf(" Release = %s\n", uts.release);
     printf(" Architecture = %s\n", uts.machine);
     printf("---------------------------------------\n");
-}
-
-/** @brief Validate the command line arguments user gived.
- *
- *  Use flags to indicate whether an argument is been called.
- *  Set the flag variables to 1 if does, and 0 if not.
- *  If any argument call violates the assumptions (see README.txt
- *  part c "Assumptions made:"), report an error.
- *  Note that "--samples=N" and "--tdelay=T" can be considered as
- *  positional arguments if they are not flagged.
- *
- *  @param argc Number of ommand line arguments.
- *  @param argv The array of strings storing command line arguments.
- *  @param sample Number of times the statistics are going to be collected.
- *  @param tdelay Period of time the statistics refresh (in seconds).
- *  @param sys_flag Point to an integer to indicate if "--system" is been called
- *  @param user_flag Point to an integer to indicate if "--user" is been called
- *  @param sequential_flag Point to an integer to indicate if "--sequential" is been called
- *  @param graph_flag Point to an integer to indicate if "--graphics" is been called
- *  @param sample_flag Point to an integer to indicate if "--sample=N" is been called
- *  @param tdelay_flag Point to an integer to indicate if "--tdelay=T" is been called
- *  @return Void.
- */
-void vertify_arg(int argc, char *argv[], int *sample, int *tdelay, int *sys_flag,
-    int *user_flag, int *sequential_flag, int *graph_flag, int *sample_flag, int *tdelay_flag) {
-
-    int tmp_sample;  // Store temporary sample size
-    int tmp_tdelay;  // Store temporary tdelay secs
-    int positional;  // Store temporary positional argument
-    int positional_arg = 0;  // Store the number of positional arguments
-
-    for (int i = 1; i < argc; i ++) {
-        if (strcmp(argv[i], "--system") == 0) {
-            if (*user_flag == 0) {
-                // If the "--user" command is not called, it's ok to have "--system" command
-                *sys_flag = 1;
-            } else {
-                handle_error("Arguments \"--system\" and \"--user\" cannot be used together!");
-            }
-        } else if (strcmp(argv[i], "--user") == 0) {
-            if (*sys_flag == 0) {
-                // If the "--system" command is not called, it's ok to have "--user" command
-                *user_flag = 1;
-            } else {
-                handle_error("Arguments \"--system\" and \"--user\" cannot be used together!");
-            }
-        } else if (strcmp(argv[i], "--graphics") == 0) {
-            *graph_flag = 1; // set the flag to 1
-        } else if (strcmp(argv[i], "--sequential") == 0) {
-            *sequential_flag = 1; // set the flag to 1
-        } else if (sscanf(argv[i], "--samples=%d", &tmp_sample) == 1) {
-            if (*sample_flag == 0) {
-                // If this is the first "--samples=N" argument called,
-                // set the sample value to the input sample value
-                // and label sample_flag to 1.
-                *sample = tmp_sample;
-                *sample_flag = 1;
-            } else if (*sample != tmp_sample) {
-                // If this value does not corresponds to other sample size value,
-                // print an error message.
-                handle_error("The value given to \"--samples=N\" should be consistent!");
-            }
-            if (*sample <= 0) {
-                // If the value is negative, print an error messgae
-                handle_error("The value given to \"--samples=N\" should be an positive integer!");
-            }
-        } else if (sscanf(argv[i], "--tdelay=%d", &tmp_tdelay) == 1) {
-            if (*tdelay_flag == 0) {
-                // If this is the first "--tdelay=T" argument called,
-                // set the tdelay value to the input tdelay value
-                // and label tdelay_flag to 1.
-                *tdelay = tmp_tdelay;
-                *tdelay_flag = 1;
-            } else if (*tdelay != tmp_tdelay) {
-                // If this value does not corresponds to previous tdelay value,
-                // print an error message.
-                handle_error("The value given to \"--tdelay=T\" should be consistent!");
-            }
-            if (*tdelay < 0) {
-                // If the value is negative, print an error messgae
-                handle_error("The value given to \"--tdelay=T\" should be an positive integer");
-            }
-        } else if (sscanf(argv[i], "%d", &positional) == 1){
-            // If the argument is a single integer
-            if (positional_arg == 0) {
-                // If this is the first integer appeared in the arguments,
-                // this would be the sample size value.
-                if (*sample_flag == 0 || *sample == positional) {
-                    // If it corresponds to other sample size value (if exists),
-                    // set sample value to positional and label sample_flag as 1
-                    *sample = positional;
-                    *sample_flag = 1;
-                } else {
-                    handle_error("The value given to \"--samples=N\" should be consistent!");
-                }
-                if (*sample <= 0) {
-                    // If the value is negative, print an error messgae
-                    handle_error("The value given to \"--samples=N\" should be an positive integer!");
-                }
-            } else if (positional_arg == 1) {
-                // If this is the second integer appeared in the arguments,
-                // this would be the tdelay value.
-                if (*tdelay_flag == 0 || *tdelay == positional) {
-                    // If it corresponds to previous tdelay value (if exists),
-                    // set tdelay to positional and label tdelay_flag as 1
-                    *tdelay = positional;
-                    *tdelay_flag = 1;
-                } else {
-                    handle_error("The value given to \"--tdelay=T\" should be consistent!");
-                }
-                if (*sample <= 0) {
-                    // If the value is negative, print an error messgae
-                    handle_error("The value given to \"--tdelay=T\" should be an positive integer!");
-                }
-            } else {
-                // If we already have 2 single integers as arguments,
-                // then print an error message
-                handle_error("No more than 2 single integers can be taken as valid arguments.");
-            }
-            positional_arg ++;
-        } else {
-            // If the statement is in other format, print an error message
-            fprintf(stderr, "Invalid arguments: \"%s\"\n", argv[i]);
-            exit(0);
-        }
-    }
 }
