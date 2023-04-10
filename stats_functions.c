@@ -1,24 +1,16 @@
 /** @file stats_functions.c
  *  @brief A report different metrics of the utilization of a system
  *
- *  This file can help user to get basic system information, including
- *  system's memory usage, users' usage, CPU usage and OS information.
- *  You can display the information in the way you like, refreshing N
- *  times or print out sequentially, showing system or user usage only,
- *  or with graphics that can virtualize the system usage change.
- *  Also you are free to decide how many times the statistics will be
- *  displayed and interval between each time the information prints.
+ *  This file imcludes the functions that report basic system information,
+ *  including runtime memory, system's memory usage, connected users, CPU
+ *  usage and OS information.
  *
  *  @author Huang Xinzi
- *  @bug No known bugs.
  */
 
 #include "stats_functions.h"
 
-/** @brief Handle errors.
- * 
- *  Display error message and then terminate the program.
- * 
+/** @brief Display error message and then terminate the program.
  *  @return Void.
  */
 void handle_error(char *message) {
@@ -97,9 +89,9 @@ void show_memory_graph(double curr_use, double previous_use) {
  *
  *  @param previous_use The physical memory used from the previous iteration.
  *  @param graph_flag An interger indicating whether "--graphics" argument is used during compiling.
- *  @return The physical memory used at current stage.
+ *  @return Void.
  */
-long get_memory_info(long previous_use, int graph_flag) {
+void get_memory_info(double previous_use, int graph_flag) {
     FILE *meminfo;   // A file pointer pointing to "/proc/meminfo"
     char line[200];  // A string storing each line of the file
     long totalram, freeram, bufferram, cachedram, totalswap, freeswap, sreclaimable;
@@ -145,17 +137,17 @@ long get_memory_info(long previous_use, int graph_flag) {
         }
     }
 
+    // write to the standrad out (use dup2 to redirect to the pipe writing end)
     printf("%.2f GB / %.2f GB  -- %.2f GB / %.2f GB", phys_used * 1e-9,
         total_phys * 1e-9, virtual_used * 1e-9, total_virtual * 1e-9);
 
     // If the "--graphics" argument is used during compiling,
     // virtualize the physical memory usage difference.
     if (graph_flag == 1) {
-        show_memory_graph(phys_used * 1e-9, previous_use * 1e-9);
+        show_memory_graph(phys_used * 1e-9, previous_use);
     } else {
         printf("\n");
     }
-    return phys_used;
 }
 
 /** @brief Calculate CPU usage (in percentage) in real-time.
@@ -170,7 +162,7 @@ long get_memory_info(long previous_use, int graph_flag) {
  *      total = user + nice + system + idle + iowait + irq + softirq
  *
  *  @param tdelay The period of time system between each time reading CPU info.
- *  @return A double of the current CPU usage (in percentage).
+ *  @return Void.
  */
 void calculate_cpu_use(int tdelay) {
     FILE * stat; // A file pointer pointing to "/proc/stat"
@@ -200,6 +192,7 @@ void calculate_cpu_use(int tdelay) {
     // Close the file. If fails, report an error.
     if (fclose(stat) != 0) {
         perror("fclose");
+        exit(1);
     }
 
     // idle = idle + iowait
@@ -219,11 +212,11 @@ void calculate_cpu_use(int tdelay) {
     // CPU (%) = (use_diff / total_diff) * 100
     double cpu_use = 100 * (double)numerator / (double)denominator;
 
-    // Return the current CPU usage for graphics
+    // write cpu usage to the stdout (use dup2 to redirect to pipe writing end)
     if (write(fileno(stdout), &cpu_use, sizeof(double)) == -1) {
         perror("write");
+        exit(1);
     }
-    // return cpu_use;
 }
 
 /** @brief Virtualize the CPU usage (in percentage).
@@ -237,11 +230,11 @@ void calculate_cpu_use(int tdelay) {
 void show_cpu_graph(double percent) {
     printf("\t");
     // Print '|' in proportion to the CPU usage percentage
-    for (int i = 0; i < (int) percent; i ++) {
+    for (int i = 0; i < (int) (percent * 2); i ++) {
         printf("|");
     }
     // Print the CPU usage percentage at the end of the graph
-    printf(" %f%%\n", percent);
+    printf(" %.2f\n", percent);
 }
 
 /** @brief Prints the number of CPU cores and CPU usage percentage.
@@ -253,6 +246,7 @@ void show_cpu_info(double cpu_use) {
 
     if (cores < 0) {  // If on error (return -1), report the error.
         perror("sysconf");
+        exit(1);
     } else {          // Otherwise print the information.
         printf("Number of cores: %d\n", cores);
     }
@@ -271,7 +265,8 @@ void show_cpu_info(double cpu_use) {
  */
 void show_session_user() {
     struct utmp *users; // a variable to store user information
-    users = getutent(); // get the information about who is currently using the system.
+    setutent();         // rewinds the file pointer to the beginning of the utmp file
+    users = getutent(); // get the information about who is currently using the system
 
     printf("### Sessions/users ###\n");
 
@@ -279,11 +274,12 @@ void show_session_user() {
     while(users != NULL) {
         // print user information if username exists
         if (users -> ut_type == USER_PROCESS) {
-        	printf(" %s\t%s (%s)\n", users -> ut_user, users -> ut_line, users -> ut_host);
+        	printf(" %s\t%s (%s)\n", users -> ut_user,
+                users -> ut_line, users -> ut_host);
         }
-        users = getutent(); // get the next user information
+        users = getutent();  // get the next user information
     }
-    endutent();
+    endutent();        // closes the utmp file
     printf("---------------------------------------\n");
 }
 
@@ -299,6 +295,7 @@ void show_sys_info() {
 
     if (uname(&uts) < 0) {    // Get the system information
         perror("Get Uname");  // If fails, report an error
+        exit(1);
     }
 
     printf("### System Information ###\n");

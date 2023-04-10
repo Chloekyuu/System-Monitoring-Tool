@@ -52,9 +52,9 @@ void show_memory_graph(double curr_use, double previous_use);
  *
  *  @param previous_use The physical memory used from the previous iteration.
  *  @param graph_flag An interger indicating whether "--graphics" argument is used during compiling.
- *  @return The physical memory used at current stage.
+ *  @return Void.
  */
-long get_memory_info(long previous_use, int graph_flag);
+void get_memory_info(double previous_use, int graph_flag);
 
 /** @brief Calculate CPU usage (in percentage) in real-time.
  * 
@@ -68,7 +68,7 @@ long get_memory_info(long previous_use, int graph_flag);
  *      total = user + nice + system + idle + iowait + irq + softirq
  *
  *  @param tdelay The period of time system between each time reading CPU info.
- *  @return A double of the current CPU usage (in percentage).
+ *  @return Void.
  */
 void calculate_cpu_use(int tdelay);
 
