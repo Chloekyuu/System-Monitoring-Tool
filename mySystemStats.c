@@ -270,6 +270,7 @@ void show_sys_usage(int sample, int tdelay, int sys, int user, int graph, int se
     char mem_info[512], user_info[512]; // to store the reported usage
     FILE *mem_file, *user_file;         // to get what child write
 
+    // sampling sample times to get the update of system usage
     for (int i = 0; i < sample; i ++) {
         if (sys == 1) {
             // create child processes to report system usage
@@ -369,22 +370,16 @@ void show_sys_usage(int sample, int tdelay, int sys, int user, int graph, int se
                 if (sequential == 1 && graph == 1) {
                     show_cpu_graph(cpu_use);  // show cpu graph if applied
                 } else if (graph == 1) {
-                    move_down(i);             // move down to the right position
+                    if (i != 0) move_down(i); // move down to the right position
                     show_cpu_graph(cpu_use);  // show cpu graph if applied
                 }
             }
             close(fd[2][STDIN_FILENO]); // close the reading end in parent
         }
     }
-    // move the cursor down to print system general information
-    move_down(3);
-    if (user == 1 && sequential == 0) {
-        move_down(n);
+    if (sys == 1) {
+        printf("---------------------------------------\n");
     }
-    if (graph == 1 && sequential == 0) {
-        move_down(sample + 1);
-    }
-    if (sys == 1) printf("---------------------------------------\n");
     show_sys_info();
 }
 
@@ -512,35 +507,29 @@ void vertify_arg(int argc, char *argv[], int *sample, int *tdelay, int *sys_flag
  */
 int main (int argc, char *argv[]) {
     // initialize sample and tdelay to their defalut value
-    int sample = 10;
-    int tdelay = 1;
+    int sample = 10, tdelay = 1;
     // create flags for each argument to check if they're called
-    int sys_flag = 0;
-    int user_flag = 0;
-    int sequential_flag = 0;
-    int graph_flag = 0;
-    int sample_flag = 0;
-    int tdelay_flag = 0;
+    int sys = 0, user = 0, sequential = 0, graph = 0, sample_f = 0, tdelay_f = 0;
 
     // validate the arguments
-    vertify_arg(argc, argv, &sample, &tdelay, &sys_flag, &user_flag,
-        &sequential_flag, &graph_flag, &sample_flag, &tdelay_flag);
+    vertify_arg(argc, argv, &sample, &tdelay, &sys, &user, &sequential, &graph,
+        &sample_f, &tdelay_f);
 
     // print the values of sample size and tdelay
     printf("Nbr of samples: %d -- every %d secs\n", sample, tdelay);
 
-    // set defalut behaviour: if no "--system" or "--user" called,
-    // display the usage for both
-    if (sys_flag == 0 && user_flag == 0) {
-        sys_flag = 1;
-        user_flag = 1;
+    // set defalut behaviour
+    // if no "--system" or "--user" called, display the usage for both
+    if (sys == 0 && user == 0) {
+        sys = 1;
+        user = 1;
     }
 
     // set signals for the parent
     set_signals_parent();
 
     // Display system (Memory / User / CPU) usage information
-    show_sys_usage(sample, tdelay, sys_flag, user_flag, graph_flag, sequential_flag);
+    show_sys_usage(sample, tdelay, sys, user, graph, sequential);
     
     return 0;
 }
