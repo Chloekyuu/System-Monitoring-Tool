@@ -13,12 +13,9 @@ A C program reporting memory utilization, connected users and CPU utilization fo
 ---
 
 1. Divide each functionality into modules:
-    1. show program memory usage
-    2. show system memory usage information (w/ graph)
-    3. show CPU information (w/ graph)
-    4. show users' information
-    5. show operation system information
-    6. set up signal handler when `ctrl-c` and `ctrl-z` are caught
+    1. Write functions to for reading program memory usage, system memory usage information (w/ graph), CPU information (w/ graph), connected users, and operation system information respectively.
+    2. Set up pipes in parent and then fork a child which reports some system usage. The child will write the information it read to pipe, and the parent receives these information and print them to the screen.
+    3. Set up signal handler when `ctrl-c` and `ctrl-z` are caught.
 2. Then design detailed function for each module:
     1. For example, when designing section (II), I first write a function `get_memory_info` to read memory usage information from Linux file "`/proc/meminfo`", and return the calculated memory use for comparing purpose. Then I write a helper function `show_memory_graph` to virtualize the memory usage difference between 2 iterations.
     2. Similar strategy is used when designing section (III) CPU usage.
@@ -177,3 +174,84 @@ A C program reporting memory utilization, connected users and CPU utilization fo
     4. Calling "`--samples=N`" or "`--tdelay=T`" multiple times with same input value will not result in error. But if the values are not consistent with each other, an error will occur.
     5. "`--samples=N`" and "`--tdelay=T`" can be considered as positional arguments (in order: samples tdelay) if they are not flagged. In this case no more than 2 integers can be taken as valid arguments.
     6. The program will intercept signals coming from `Ctrl-Z` and `Ctrl-C`. For the former, it will just ignore it as the program should not be run in the background while running interactively. For the latter, the program will ask the user whether it really wants to quit or not.
+
+## Example Output
+
+---
+
+```
+$ time ./mySystemStats 5 --graphics
+Nbr of samples: 5 -- every 1 secs
+ Memory usage: 2488 kilobytes
+---------------------------------------
+### Memory ### (Phys.Used/Tot -- Virtual Used/Tot)
+3.44 GB / 8.14 GB  -- 6.36 GB / 18.73 GB  |o 0.00 (3.44)
+3.45 GB / 8.14 GB  -- 6.37 GB / 18.73 GB  |o 0.00 (3.45)
+3.45 GB / 8.14 GB  -- 6.38 GB / 18.73 GB  |@ 0.00 (3.45)
+3.45 GB / 8.14 GB  -- 6.38 GB / 18.73 GB  |@ 0.00 (3.45)
+3.45 GB / 8.14 GB  -- 6.38 GB / 18.73 GB  |o 0.00 (3.45)
+---------------------------------------
+### Sessions/users ###
+ zha10849   pts/102 (tmux(538474).%0)
+ zha10849   pts/97 (tmux(538474).%3)
+ vainerga   pts/295 (tmux(2313825).%2)
+ zha10849   pts/308 (tmux(2052441).%4)
+ zha10849   pts/315 (tmux(2052441).%5)
+ lamerin2   pts/710 (tmux(1221719).%0)
+ effendia   pts/737 (tmux(1273544).%0)
+ vainerga   pts/700 (tmux(2313825).%0)
+ jookendr   pts/802 (tmux(2856911).%0)
+ lamerin2   pts/856 (tmux(3054602).%0)
+ wangz725   pts/1031 (99.229.78.191)
+ jookendr   pts/1040 (70.55.37.244)
+ huan2534   pts/1069 (184.147.220.161)
+ jianganq   pts/1084 (69.166.116.217)
+---------------------------------------
+Number of cores: 3
+ total cpu use = 1.00%
+    |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| 33.33
+    |||||||||||||||||||||||||||||||||||||||||||||||||||||||||| 29.10
+    || 1.01
+    ||| 1.67
+    || 1.00
+---------------------------------------
+### System Information ###
+ System Name = Linux
+ Machine Name = mathlab
+ Version = #154-Ubuntu SMP Thu Jan 5 17:03:22 UTC 2023
+ Release = 5.4.0-137-generic
+ Architecture = x86_64
+---------------------------------------
+
+real    0m5.007s
+user    0m0.001s
+sys 0m0.003s
+```
+
+## Additional Information
+
+---
+
+1. Calculate the memory usage based on following equations:
+    
+    $$
+    \begin{align*} &\text{total physical memory = MemTotal} \\ &\text{used physical memory = MemTotal - MemFree - (Buffers + Cached Memory)} \\ &\text{total virtual memory = MemTotal + SwapTotal} \\ &\text{used virtual memory = total virtual memory - SwapFree - MemFree - (Buffers + Cached Memory)} \\ \\&\text{where, Cached memory = Cached + SReclaimable} \end{align*}
+    
+    $$
+    
+    Reference: [https://stackoverflow.com/questions/41224738/how-to-calculate-system-memory-usage-from-proc-meminfo-like-htop](https://stackoverflow.com/questions/41224738/how-to-calculate-system-memory-usage-from-proc-meminfo-like-htop)
+    
+2. Virtualize the physical memory usage difference:
+    - `::::::@` denoted that the total relative change is negative.
+    - `######*` denoted that the total relative change is positive.
+    - `|o` denoted the total relative change is positive infinitesimal
+    - `|@` denoted the total relative change is negative infinitesimal
+3. Calculate CPU utilization
+    1. Take two samples of the CPU usage, e.g. at times $*t_1*$ and $*t_2$ (sleep tdelay seconds in between)*. Use the `/proc/stat` file to read the data from the CPU times for each sample.
+    2. Let $t_\text{total}$ be total CPU time since boot, $t_\text{idle}$ be total idle CPU time since boot, and $t_\text{usage}$ be total used CPU time since boot. Total CPU usage in real-time is then just the ratio of $\Delta t_\text{usage}$ to $\Delta t_\text{total}$.
+        
+        $$
+        \begin{align*} &t_\text{total}\ = \rm user_i + nice_i + system_i + idle_i + iowait_i + irq_i + softirq_i \\ &t_\text{idle}\ \  = \text{idle}_i + \text{iowait}_i \\ &t_\text{usage} = t_\text{total} - t_\text{idle} \end{align*} \implies \text{CPU }(\%) = \frac{\Delta t_\text{usage}}{\Delta t_\text{total}} \times 100 \%
+        $$
+        
+    3. Reference: [https://www.kgoettler.com/post/proc-stat/](https://www.kgoettler.com/post/proc-stat/)
