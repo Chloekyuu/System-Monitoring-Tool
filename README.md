@@ -236,7 +236,6 @@ sys 0m0.003s
     
     $$
     \begin{align*} &\text{total physical memory = MemTotal} \\ &\text{used physical memory = MemTotal - MemFree - (Buffers + Cached Memory)} \\ &\text{total virtual memory = MemTotal + SwapTotal} \\ &\text{used virtual memory = total virtual memory - SwapFree - MemFree - (Buffers + Cached Memory)} \\ \\&\text{where, Cached memory = Cached + SReclaimable} \end{align*}
-    
     $$
     
     Reference: [https://stackoverflow.com/questions/41224738/how-to-calculate-system-memory-usage-from-proc-meminfo-like-htop](https://stackoverflow.com/questions/41224738/how-to-calculate-system-memory-usage-from-proc-meminfo-like-htop)
@@ -247,7 +246,7 @@ sys 0m0.003s
     - `|o` denoted the total relative change is positive infinitesimal
     - `|@` denoted the total relative change is negative infinitesimal
 3. Calculate CPU utilization
-    1. Take two samples of the CPU usage, e.g. at times $*t_1*$ and $*t_2$ (sleep tdelay seconds in between)*. Use the `/proc/stat` file to read the data from the CPU times for each sample.
+    1. Take two samples of the CPU usage, e.g. at times $t_1$ and $t_2$ (sleep tdelay seconds in between)*. Use the `/proc/stat` file to read the data from the CPU times for each sample.
     2. Let $t_\text{total}$ be total CPU time since boot, $t_\text{idle}$ be total idle CPU time since boot, and $t_\text{usage}$ be total used CPU time since boot. Total CPU usage in real-time is then just the ratio of $\Delta t_\text{usage}$ to $\Delta t_\text{total}$.
         
         $$
